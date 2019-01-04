@@ -13,8 +13,8 @@
 #define TRACK_LENGTH                (6945.554)
 #define SMOOTH_POINTS_DIST          (0.2)
 
-#define DISPLAY_PATH_POINTS         (150)
-#define PREVIOUS_POINTS_TO_KEEP     (50)
+#define DISPLAY_PATH_POINTS         (200)
+#define PREVIOUS_POINTS_TO_KEEP     (25)
 
 #define INTERVAL                    (0.02)
 #define MAX_SPEED                   (45/2.23694)

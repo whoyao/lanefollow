@@ -11,8 +11,8 @@
 #include "json.hpp"
 #include <sys/timeb.h>
 #include "JMT_planner.h"
-
-#define LOOKHEAD (30.0)
+#include "common.h"
+#include "common/util/log.h"
 
 
 using namespace std;
@@ -42,6 +42,33 @@ string hasData (string s) {
     return "";
 }
 
+std::vector<DynamicObjectXY> get_dynamic_obstacle(std::vector<std::vector<double>> sensor_fusion){
+    std::vector<DynamicObjectXY> res_vec;
+    for (auto one : sensor_fusion) {
+        DynamicObjectXY one_obstacle (one[1], one[2], std::sqrt(one[3]*one[3]+one[4]*one[4]), std::atan2(one[4], one[3]),
+                                        2.0, 2.0);
+        res_vec.push_back(std::move(one_obstacle));
+    }
+    return res_vec;
+
+}
+
+int MatchPointInCurvePointList(CurvePoint test_point, std::vector<CurvePoint> point_list){
+    int index = 0;
+    int min_index = index;
+    double min_dis = std::numeric_limits<double>::infinity();
+    for(auto point : point_list) {
+        double temp_dis = test_point.DistanceSquareTo(point);
+        if( temp_dis < min_dis ) {
+            min_dis = temp_dis;
+            min_index = index;
+        }
+        index ++;
+    }
+    return index;
+}
+
+
 ///////ATTENTION: Since I calculate car acc from the interval time of each loop, run program before start simulation
 
 int main () {
@@ -57,18 +84,18 @@ int main () {
     // Waypoint map to read from
     string map_file_ = "../data/highway_map.csv";
     TopologyManager topology_manager(map_file_);
-    JMT_
+    JMT::JMTPlanner planner(&topology_manager);
     // The max s value before wrapping around the track back to 0
     double max_s = 6945.554;
 
 
     // TODO: remove out, debug_flag, almostFinish, currentCircle, last_x_val, last_y_val
     h.onMessage(
-            [ &map_waypoints_x, &map_waypoints_y, &map_waypoints_s] (
+            [ &planner ] (
                     uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                     uWS::OpCode opCode) {
 
-                static std::vector<std::vector<double>> last_Frenet;
+                static std::vector<CurvePoint> last_path;
                 // "42" at the start of the message means there's a websocket message event.
                 // The 4 signifies a websocket message
                 // The 2 signifies a websocket event
@@ -105,111 +132,40 @@ int main () {
 
                             /************************************* HERE IS MY CODE ******************** ****************/
                             int num_waypoints = map_waypoints_x.size();
-                            int next_waypoint_index = NextWaypoint(car_x, car_y, car_yaw, map_waypoints_x, map_waypoints_y);
 
-                            tk::spline s1;
-                            tk::spline s2;
-                            vector<double> ptss;
-                            vector<double> ptsx;
-                            vector<double> ptsy;
-                            vector<double> smooth_map_waypoints_x;
-                            vector<double> smooth_map_waypoints_y;
-                            vector<double> smooth_map_waypoints_s;
+                            CurvePoint current_pose;
+                            current_pose.x = car_x;
+                            current_pose.y = car_y;
+                            current_pose.theta = car_yaw;
+                            current_pose.v = car_speed;
 
-                            // windows for smooth current path
-                            for (int i = -NUM_WAYPOINTS_BEHIND; i < NUM_WAYPOINTS_AHEAD; i++) {
-                                // for smooting, take so many previous and so many subsequent waypoints
-                                int idx = (next_waypoint_index+i) % num_waypoints;
-                                if (idx < 0) {
-                                    // correct for wrap
-                                    idx += num_waypoints;
-                                }
-                                // correct for wrap in s for spline interpolation (must be continuous)
-                                double current_s = map_waypoints_s[idx];
-                                double base_s = map_waypoints_s[next_waypoint_index];
-                                // start of a new circle
-                                if (i < 0 && current_s > base_s) {
-                                    current_s -= TRACK_LENGTH;
-                                    if(almostFinish){
-                                        currentCircle += 1;
-                                        update_flag = true;
-                                    }
-                                }
-                                // end of current circle
-                                if (i > 0 && current_s < base_s) {
-                                    current_s += TRACK_LENGTH;
-                                    almostFinish = true;
-                                } else {
-                                    almostFinish = false;
-                                }
+                            auto dynamic_obstacle = get_dynamic_obstacle(sensor_fusion);
+                            planner.update(dynamic_obstacle, current_pose, std::numeric_limits<double>::infinity());
 
-                                // keep points for spline smooth
-                                ptss.push_back(current_s);
-                                ptsx.push_back(map_waypoints_x[idx]);
-                                ptsy.push_back(map_waypoints_y[idx]);
-                            }
-
-                            // smooth current path
-                            s1.set_points(ptss, ptsx);
-                            s2.set_points(ptss, ptsy);
-                            auto iterx = map_waypoints_x.begin();
-                            auto itery = map_waypoints_y.begin();
-                            // do not smooth the path before current path, just push back the map points for getFrennet.
-                            for (auto iters = map_waypoints_s.begin(); *iters < *ptss.begin(); iters++) {
-                                smooth_map_waypoints_s.push_back(*iters);
-                                smooth_map_waypoints_x.push_back(*(iterx++));
-                                smooth_map_waypoints_y.push_back(*(itery++));
-                            }
-                            // smooth current path
-                            for (double s = *ptss.begin(); s < ceil(*( ptss.end() - 1 )); s += SMOOTH_POINTS_DIST) {
-                                smooth_map_waypoints_s.push_back(s);
-                                smooth_map_waypoints_x.push_back(s1(s));
-                                smooth_map_waypoints_y.push_back(s2(s));
-                            }
-
-                            vector<double> car_s_d = getFrenet(car_x, car_y, car_yaw, smooth_map_waypoints_x, smooth_map_waypoints_y);
-                            double car_s = car_s_d[0];
-
-                            INFO(car_s_fake);
                             // points was left
                             int prev_size = previous_path_x.size();
                             char tmp[128];
-                            sprintf(tmp,"points need keep is %d, but total pass is %d.",PREVIOUS_POINTS_TO_KEEP, DISPLAY_PATH_POINTS - prev_size );
-                            ERROR(tmp);
+                            AINFO << "points need keep is " << PREVIOUS_POINTS_TO_KEEP << ", but total pass is " << DISPLAY_PATH_POINTS - prev_size;
                             if(DISPLAY_PATH_POINTS - prev_size > PREVIOUS_POINTS_TO_KEEP) {
                                 ERROR("point is not enough.");
                             }
 
-                            // cuurent car pose in s direction
-                            double car_pose_s[] = {car_s, car_speed / 2.23694, car_acc};
-                            // current car pose in d direction
-                            double car_pose_d[] = {car_d, car_speed_d, car_acc_d};
-                            // make sure path is smooth in low speed, ignore d_dot and d_dotdot in low speed
-                            if(ego_state.current_state == START){
-                                car_pose_d[1] = 0.0;
-                                car_pose_d[2] = 0.0;
+                            int last_index = min(prev_size, PREVIOUS_POINTS_TO_KEEP);
+
+                            CurvePoint planning_init_point;
+                            if(last_index < 5 || last_path.empty()) {
+                                planning_init_point = current_pose;
+                            } else {
+                                CurvePoint temp_point, planning_init_point;
+                                double x = previous_path_x[last_index];
+                                double y = previous_path_y[last_index];
+                                temp_point.x = x;
+                                temp_point.y = y;
+                                int indx_on_last_path = MatchPointInCurvePointList(temp_point, last_path);
+                                planning_init_point = last_path[indx_on_last_path];
                             }
+                            auto new_path = planner.plan_new(planning_init_point, std::numeric_limits<double>::infinity(), 20);
 
-                            static bool first = true;
-                            if(last_x_val.size() > 0) {
-                                for (int i = 0; i < DISPLAY_PATH_POINTS - prev_size; i++) {
-                                    out << std::fixed << std::setprecision(10) << last_x_val[i] << "," << last_y_val[i] << endl;
-                                    if(!first) {
-                                        out2 << std::fixed << std::setprecision(10) << last_Frenet[i][0] << "," << last_Frenet[i][1] << endl;
-                                    }
-                                }
-                                if(first){
-                                    for (int i = 0; i < DISPLAY_PATH_POINTS - prev_size + PREVIOUS_POINTS_TO_KEEP; i++) {
-                                        out2 << std::fixed << std::setprecision(10) << last_Frenet[i][0] << "," << last_Frenet[i][1] << endl;
-                                    }
-                                }
-                                first = false;
-                            }
-
-
-                            // THE MOST IMPORTANT FUNCTION OF MY CODE, choose the best state and the best traj
-                            const TG::path_with_cost_group &all_trajectory_Frenet = ego_state.get_all_trajectory_Frenet(
-                                    car_s_fake, sensor_fusion, prev_size, car_pose_s, car_pose_d, update_flag);
 /*
                             for(const auto & a_traj : all_trajectory_Frenet) {
                                 const auto temp = std::get<1>(a_traj);
@@ -221,66 +177,31 @@ int main () {
                             }  */
 
 
-                            TG::path_xy_with_cost_group after_tran;
-
-                            for(const auto &one_trajectory_Frenet : all_trajectory_Frenet){
-                                TG::points_xy_2d one_traj_xy;
-                                const auto &one_traj_frenet = get<1>(one_trajectory_Frenet);
-
-                                auto iterFs = one_traj_frenet[0].begin();
-                                auto iterFd = one_traj_frenet[1].begin();
-                                for(int i=0; i<one_traj_frenet[0].size(); i++){
-                                     one_traj_xy.emplace_back( getXY( *((iterFs+i)->begin()), *((iterFd+i)->begin()),
-                                                                               smooth_map_waypoints_s, smooth_map_waypoints_x,
-                                                                               smooth_map_waypoints_y) );
-                                }
-
-                                after_tran.emplace_back(make_tuple(get<0>(one_trajectory_Frenet), one_traj_xy, get<2>(one_trajectory_Frenet), get<3>(one_trajectory_Frenet)));
-
-                            }
-
-
-                            TG::points_xy_2d next_XY = ego_state.choose_next_state(after_tran);
-
-                            last_Frenet = next_XY;
                             // Define the actual (X,Y) points we will use for the planner
                             std::vector<double> next_x_vals;
                             std::vector<double> next_y_vals;
 
                             // keep 10 points in front of our car, make sure the path is smooth
-                            for (int i = 0; i < min(prev_size, PREVIOUS_POINTS_TO_KEEP); i++) {
+                            for (int i = 0; i < last_index; i++) {
                                 next_x_vals.emplace_back(previous_path_x[i]);
                                 next_y_vals.emplace_back(previous_path_y[i]);
                             }
 
-                            timepast = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now()-last_time);
-                            cout << "time point 1 : " << timepast.count() << endl;
-                            last_time = std::chrono::steady_clock::now();
-
 
                             //Fill up the rest of our path planner after filling it with previous points, here we will always output 150 points
-                            for(const auto& point_xy_2d : next_XY){
-                                next_x_vals.emplace_back(point_xy_2d[0]);
-                                next_y_vals.emplace_back(point_xy_2d[1]);
+                            for(const auto& point_xy_2d :new_path ){
+                                next_x_vals.emplace_back(point_xy_2d.x);
+                                next_y_vals.emplace_back(point_xy_2d.y);
                             }
 
 //                            out2 << temp_goal_XY[0] + 1 << ',' << temp_goal_XY[1] << endl;
-                            ERROR(next_XY.front().front());
-                            ERROR(next_XY.front().back());
-
-                            last_x_val = next_x_vals;
-                            last_y_val = next_y_vals;
-
 //                            auto iter1 = next_x_vals.begin();
 //                            auto iter2 = next_y_vals.begin();
 //                            for(int i=0;i<next_x_vals.size();i++){
 //                                cout << *(iter1+i) << ";" << *(iter2+i) << endl;
 //                            }
 
-                            timepast = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now()-last_time);
-                            cout << "time point 2 : " << timepast.count() << endl;
-                            last_time = std::chrono::steady_clock::now();
-
+                            last_path = new_pah;
                             /*********************************** END OF MY CODE ****************************************/
 
                             json msgJson;

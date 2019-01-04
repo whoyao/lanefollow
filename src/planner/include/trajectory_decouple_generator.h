@@ -24,13 +24,13 @@ namespace JMT {
     using TrajectorySets = std::vector<std::shared_ptr<PolynomialCurve1d>>;
 
     namespace TrajectoryCombiner {
-        std::vector<CurvePoint> Combine(
-                const std::vector<CurvePoint>& reference_line,
-                const PolynomialCurve1d& lon_trajectory, const PolynomialCurve1d& lat_trajectory,
-                double init_relative_time);
+//        std::vector<CurvePoint> Combine(
+//                const std::vector<CurvePoint>& reference_line,
+//                const PolynomialCurve1d& lon_trajectory, const PolynomialCurve1d& lat_trajectory,
+//                double init_relative_time);
 
         std::vector<CurvePoint> Combine1d(
-                const TopologyManager* topology,
+                const std::shared_ptr<TopologyManager> topology,
                 const PolynomialCurve1d& lon_trajectory, double init_relative_time);
     }
 
