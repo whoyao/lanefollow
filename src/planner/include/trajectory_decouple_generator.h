@@ -7,13 +7,11 @@
 
 #include "JMT_gflags.h"
 #include "common/struct/traj_structs.h"
-#include "common/struct/lane_struct.h"
 #include "JMT_curve1d.h"
 #include "quartic_polynomial_curve1d.h"
 #include "quintic_polynomial_curve1d.h"
 #include "end_condition_sampler.h"
-#include "reference_line.h"
-#include "manager/TopologyManager.h"
+#include "TopologyManager.h"
 
 
 namespace JMT {

@@ -14,7 +14,7 @@
 namespace cyber_common {
 namespace math {
 
-using cyber_common::math::Vec2d;
+//using cyber_common::math::Vec2d;
 
 void CartesianFrenetConverter::cartesian_to_frenet(
     const double rs, const double rx, const double ry, const double rtheta,
@@ -145,14 +145,6 @@ double CartesianFrenetConverter::CalculateKappa(const double rkappa,
                            l * ddl * rkappa + l * l * rkappa * rkappa * rkappa +
                            l * dl * rdkappa + 2 * dl * dl * rkappa;
   return numerator / denominator;
-}
-
-Vec2d CartesianFrenetConverter::CalculateCartesianPoint(const double rtheta,
-                                                        const Vec2d& rpoint,
-                                                        const double l) {
-  const double x = rpoint.x() - l * std::sin(rtheta);
-  const double y = rpoint.y() + l * std::cos(rtheta);
-  return Vec2d(x, y);
 }
 
 double CartesianFrenetConverter::CalculateLateralDerivative(

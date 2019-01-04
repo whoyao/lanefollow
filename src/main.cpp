@@ -3,6 +3,8 @@
 #include <uWS/uWS.h>
 #include <chrono>
 #include <iostream>
+#include <sstream>
+#include <fstream>
 #include <thread>
 #include <vector>
 #include <tuple>
@@ -65,7 +67,7 @@ int MatchPointInCurvePointList(CurvePoint test_point, std::vector<CurvePoint> po
         }
         index ++;
     }
-    return index;
+    return min_index;
 }
 
 
@@ -74,17 +76,10 @@ int MatchPointInCurvePointList(CurvePoint test_point, std::vector<CurvePoint> po
 int main () {
     uWS::Hub h;
 
-    // Load up map values for waypoint's x,y,s and d normalized normal vectors
-    vector<double> map_waypoints_x;
-    vector<double> map_waypoints_y;
-    vector<double> map_waypoints_s;
-    vector<double> map_waypoints_dx;
-    vector<double> map_waypoints_dy;
-
     // Waypoint map to read from
     string map_file_ = "../data/highway_map.csv";
-    TopologyManager topology_manager(map_file_);
-    JMT::JMTPlanner planner(&topology_manager);
+    auto topology_manager = std::make_shared<TopologyManager>(map_file_);
+    JMT::JMTPlanner planner(topology_manager);
     // The max s value before wrapping around the track back to 0
     double max_s = 6945.554;
 
@@ -92,10 +87,16 @@ int main () {
     // TODO: remove out, debug_flag, almostFinish, currentCircle, last_x_val, last_y_val
     h.onMessage(
             [ &planner ] (
-                    uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+                    uWS::WebSocket<uWS::SERVER> *ws, char *data, size_t length,
                     uWS::OpCode opCode) {
 
                 static std::vector<CurvePoint> last_path;
+                static int cnt = 0;
+                std::stringstream ss;
+                ss << cnt << ".txt";
+                cnt++;
+
+
                 // "42" at the start of the message means there's a websocket message event.
                 // The 4 signifies a websocket message
                 // The 2 signifies a websocket event
@@ -131,7 +132,6 @@ int main () {
                             auto sensor_fusion = j[1]["sensor_fusion"];
 
                             /************************************* HERE IS MY CODE ******************** ****************/
-                            int num_waypoints = map_waypoints_x.size();
 
                             CurvePoint current_pose;
                             current_pose.x = car_x;
@@ -145,10 +145,10 @@ int main () {
                             // points was left
                             int prev_size = previous_path_x.size();
                             char tmp[128];
-                            AINFO << "points need keep is " << PREVIOUS_POINTS_TO_KEEP << ", but total pass is " << DISPLAY_PATH_POINTS - prev_size;
-                            if(DISPLAY_PATH_POINTS - prev_size > PREVIOUS_POINTS_TO_KEEP) {
-                                ERROR("point is not enough.");
-                            }
+//                            AINFO << "points need keep is " << PREVIOUS_POINTS_TO_KEEP << ", but total pass is " << DISPLAY_PATH_POINTS - prev_size;
+//                            if(DISPLAY_PATH_POINTS - prev_size > PREVIOUS_POINTS_TO_KEEP) {
+//                                ERROR("point is not enough.");
+//                            }
 
                             int last_index = min(prev_size, PREVIOUS_POINTS_TO_KEEP);
 
@@ -156,7 +156,7 @@ int main () {
                             if(last_index < 5 || last_path.empty()) {
                                 planning_init_point = current_pose;
                             } else {
-                                CurvePoint temp_point, planning_init_point;
+                                CurvePoint temp_point;
                                 double x = previous_path_x[last_index];
                                 double y = previous_path_y[last_index];
                                 temp_point.x = x;
@@ -164,7 +164,7 @@ int main () {
                                 int indx_on_last_path = MatchPointInCurvePointList(temp_point, last_path);
                                 planning_init_point = last_path[indx_on_last_path];
                             }
-                            auto new_path = planner.plan_new(planning_init_point, std::numeric_limits<double>::infinity(), 20);
+                            auto new_path = planner.plan_debug(planning_init_point, std::numeric_limits<double>::infinity(), 20);
 
 /*
                             for(const auto & a_traj : all_trajectory_Frenet) {
@@ -194,14 +194,10 @@ int main () {
                                 next_y_vals.emplace_back(point_xy_2d.y);
                             }
 
-//                            out2 << temp_goal_XY[0] + 1 << ',' << temp_goal_XY[1] << endl;
-//                            auto iter1 = next_x_vals.begin();
-//                            auto iter2 = next_y_vals.begin();
-//                            for(int i=0;i<next_x_vals.size();i++){
-//                                cout << *(iter1+i) << ";" << *(iter2+i) << endl;
-//                            }
 
-                            last_path = new_pah;
+
+
+                            last_path = new_path;
                             /*********************************** END OF MY CODE ****************************************/
 
                             json msgJson;
@@ -211,13 +207,13 @@ int main () {
                             auto msg = "42[\"control\"," + msgJson.dump() + "]";
 
                             //this_thread::sleep_for(chrono::milliseconds(1000));
-                            ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+                            ws->send(msg.data(), msg.length(), uWS::OpCode::TEXT);
 
                         }
                     } else {
                         // Manual driving
                         std::string msg = "42[\"manual\",{}]";
-                        ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+                        ws->send(msg.data(), msg.length(), uWS::OpCode::TEXT);
                     }
                 }
             });
@@ -236,18 +232,18 @@ int main () {
         }
     });
 
-    h.onConnection([&h] (uWS::WebSocket<uWS::SERVER> ws, uWS::HttpRequest req) {
+    h.onConnection([&h] (uWS::WebSocket<uWS::SERVER> *ws, uWS::HttpRequest req) {
         std::cout << "Connected!!!" << std::endl;
     });
 
-    h.onDisconnection([&h] (uWS::WebSocket<uWS::SERVER> ws, int code,
+    h.onDisconnection([&h] (uWS::WebSocket<uWS::SERVER> *ws, int code,
                             char *message, size_t length) {
-        ws.close();
+        ws->close();
         std::cout << "Disconnected" << std::endl;
     });
 
     int port = 4567;
-    if (h.listen(port)) {
+    if (h.listen("127.0.0.1", port)) {
         std::cout << "Listening to port " << port << std::endl;
     } else {
         std::cerr << "Failed to listen to port" << std::endl;

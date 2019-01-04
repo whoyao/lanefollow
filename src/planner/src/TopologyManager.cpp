@@ -2,7 +2,10 @@
 // Created by luyifan on 18-1-12.
 //
 
-#include "manager/TopologyManager.h"
+#include "TopologyManager.h"
+#include <algorithm>
+#include <fstream>
+#include <boost/algorithm/string/split.hpp>
 
 
 CurvePoint PathMatcher::MatchToPath(const std::vector<CurvePoint>& reference_line,
@@ -78,7 +81,7 @@ CurvePoint PathMatcher::FindProjectionPoint(const CurvePoint& p0,
 
 
 // 读取原始路径文件
-FILESTATUS ReadFile(const std::string filename, std::vector<CurvePoint> &reference_points) {
+FILE_STATUS ReadFile(const std::string filename, std::vector<CurvePoint> &reference_points) {
 
     // 测试文件是否存在
     std::ifstream fin;
@@ -102,7 +105,7 @@ FILESTATUS ReadFile(const std::string filename, std::vector<CurvePoint> &referen
             }
             temp.x = std::stod(strs[0]);
             temp.y = std::stod(strs[1]);
-            TaskPoints.push_back(temp);
+            reference_points.push_back(temp);
         }
     }
     fin.close();
@@ -118,10 +121,18 @@ ReferenceLine::ReferenceLine (const std::vector<CurvePoint> &sparse_points) {
 
 
 bool ReferenceLine::UpdateReferenceLine(const std::vector<CurvePoint> &sparse_points) {
+    bool status = false;
     sparse_points_ = sparse_points;
-    return smoother_.clothoideSpline(sparse_points, sparse_points[0].theta,
+    std::vector<CurvePoint> interpolated_points, interpolated_points2;
+    smoother_.sampleLinearEquidist(sparse_points,2.0,interpolated_points);
+    status =  smoother_.clothoideSpline(interpolated_points, sparse_points[0].theta,
                                    sparse_points[0].kappa, sparse_points[0].s,
-                                   FLAGS_clothoide_n_lookahead, reference_points_);
+                                   FLAGS_clothoide_n_lookahead, interpolated_points2);
+    smoother_.sampleLinearEquidist(interpolated_points2,0.5,interpolated_points);
+    status = status & smoother_.clothoideSpline(interpolated_points, sparse_points[0].theta,
+                              sparse_points[0].kappa, sparse_points[0].s,
+                              FLAGS_clothoide_n_lookahead, reference_points_);
+    return status;
 }
 
 CurvePoint ReferenceLine::MatchToPath (double x, double y) const{
@@ -138,17 +149,17 @@ double ReferenceLine::GetEndS() const{
 
 TopologyManager::TopologyManager(std::string file_name){
     std::vector<CurvePoint> sparse_points;
-    status_ = ReadFile(file_name, &sparse_points);
+    status_ = ReadFile(file_name, sparse_points);
     reference_line_ = std::make_shared<ReferenceLine>(sparse_points);
 }
 
 
 CurvePoint TopologyManager::MatchToPath (double x, double y) const {
-    return reference_line_.MatchToPath(x, y);
+    return reference_line_->MatchToPath(x, y);
 }
 
 CurvePoint TopologyManager::MatchToPath (double s) const {
-    return reference_line_.MatchToPath(s);
+    return reference_line_->MatchToPath(s);
 }
 
 void TopologyManager::UpdateCurrentPose(const CurvePoint& curve_point) {
@@ -156,7 +167,7 @@ void TopologyManager::UpdateCurrentPose(const CurvePoint& curve_point) {
 }
 
 double TopologyManager::GetReferenceLineEndS() const{
-    return reference_line_.GetEndS();
+    return reference_line_->GetEndS();
 }
 
 

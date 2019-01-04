@@ -20,10 +20,9 @@
 #include "JMT_gflags.h"
 #include "polynomial_curve1d.h"
 #include "common/util/log.h"
-#include "common/struct/lane_struct.h"
 #include "common/struct/traj_structs.h"
-#include "manager/TopologyManager.h"
-#include "tiggo_msgs/ObjectList.h"
+#include "TopologyManager.h"
+//#include "tiggo_msgs/ObjectList.h"
 
 namespace JMT {
 

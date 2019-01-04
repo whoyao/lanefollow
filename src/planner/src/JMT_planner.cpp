@@ -3,6 +3,8 @@
 //
 
 #include "JMT_planner.h"
+#include <fstream>
+#include <sstream>
 #include "common/math/cartesian_frenet_conversion.h"
 
 
@@ -316,7 +318,7 @@ namespace JMT {
         }
     }
 
-    std::vector JMTPlanner::plan_new(const CurvePoint& planning_init_point,
+    std::vector<CurvePoint> JMTPlanner::plan_new(const CurvePoint& planning_init_point,
                                                    const double stop_s,
                                                    const double target_speed) {
 
@@ -376,5 +378,93 @@ namespace JMT {
 
     }
 
+
+    // TODO : dynamic car transform, lane position, grid_map_check;
+    std::vector<CurvePoint> JMTPlanner::plan_debug(
+            const CurvePoint& planning_init_point,
+            const double stop_s,
+            const double target_speed) {
+
+        AINFO << "Dis to obstacle is: " << dis_to_static_obstacle_;
+
+        CurvePoint matched_point = topology_manager_->MatchToPath(planning_init_point.x, planning_init_point.y);
+
+        std::array<double, 3> init_s = {0.0, 0.0, 0.0};
+        std::array<double, 3> init_d = {0.0, 0.0, 0.0};
+        ComputeInitFrenetState(matched_point, planning_init_point, &init_s, &init_d);
+        Trajectory1dGenerator trajectory_1d_generator(init_s);
+        TrajectorySets trajectory_sets;
+
+        trajectory_1d_generator.GenerateTrajectorySets(stop_s, dis_to_static_obstacle_, target_speed_,
+                                                       &trajectory_sets);
+
+        TrajectoryEvaluator trajectory_evaluator(
+                init_s, stop_s, dis_to_static_obstacle_, target_speed,
+                dynamic_objects_sd_, &trajectory_sets);
+
+        AWARN << "Total trajectories number: " << trajectory_evaluator.num_of_trajectory_pairs();
+
+        std::size_t sd_dynamic_collision_failure_count = 0;
+        std::size_t sd_static_collision_failure_count = 0;
+
+
+        std::vector<CurvePoint> debug_res; // TODO : remove
+        int cnt = 0;
+        while (trajectory_evaluator.has_more_trajectory_pairs()) {
+            Result trajectory_result = trajectory_evaluator.top_trajectory_pair_status();
+            if (trajectory_result != Result::VALID) {
+                switch (trajectory_result) {
+                    case Result::LON_DYNAMIC_COLLISION:
+                        sd_dynamic_collision_failure_count += 1;
+                        break;
+                    case Result::LON_STATIC_COLLISION:
+                        sd_static_collision_failure_count += 1;
+                        break;
+                    default:
+                        // Intentional empty
+                        break;
+                }
+                continue;
+            }
+
+#ifdef JMT_DEBUG
+            auto cost_component = trajectory_evaluator.get_top_cost_component();
+#endif
+
+            double trajectory_pair_cost =
+                    trajectory_evaluator.top_trajectory_pair_cost();
+
+            auto trajectory_pair = trajectory_evaluator.next_top_trajectory_pair();
+
+            // combine two 1d trajectories to one 2d trajectory
+            auto combined_trajectory = TrajectoryCombiner::Combine1d(
+                    topology_manager_, *trajectory_pair, 0.0);
+
+            double end_ss = std::dynamic_pointer_cast<JMT_curve1d>(trajectory_pair)->target_position();
+            double end_st = std::dynamic_pointer_cast<JMT_curve1d>(trajectory_pair)->ParamLength();
+            double end_sv = std::dynamic_pointer_cast<JMT_curve1d>(trajectory_pair)->target_velocity();
+
+            if(debug_res.empty()) {    // TODO: remove
+                debug_res = combined_trajectory;
+            }
+
+            std::stringstream ss;
+            ss << cnt << "-" << cost_component[0] << "-" << cost_component[1] << "-" << cost_component[2] << "-" << cost_component[3] << ".txt";
+            std::ofstream fout(ss.str());
+            for(const auto &point : combined_trajectory){
+                fout << point.x << ";" << point.y << std::endl;
+            }
+            fout.close();
+            cnt++;
+//                    return res;
+        }
+        return debug_res; // TODO: remove
+
+//        AWARN << "LON_DYNAMIC_COLLISION number: " << sd_dynamic_collision_failure_count;
+//        AWARN << "STATIC COLLISION number: " << sd_static_collision_failure_count;
+//        tiggo_msgs::LocalTrajList empty;
+//        return empty;
+
+    }
 
 } // namespace JMt

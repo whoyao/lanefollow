@@ -13,7 +13,6 @@
 #include "trajectory_decouple_generator.h"
 #include "trajectory_evaluator.h"
 #include "curveSmoother.h"
-#include "reference_line.h"
 #include "common/struct/traj_structs.h"
 
 
@@ -40,9 +39,9 @@ namespace JMT {
 //                double stop_s,
 //                double target_speed);
 //
-        void update(const tiggo_msgs::ObjectList& dynamic_objects,
-                    const CurvePoint& current_pose,
-                    const double dis_to_static_obstacle);
+//        void update(const tiggo_msgs::ObjectList& dynamic_objects,
+//                    const CurvePoint& current_pose,
+//                    const double dis_to_static_obstacle);
 
         std::vector<CurvePoint> plan (
                 const CurvePoint& planning_init_point,
@@ -54,12 +53,12 @@ namespace JMT {
                 double stop_s,
                 double target_speed);
 
-        std::vector<CurvePoint> JMTPlanner::plan_new(
+        std::vector<CurvePoint> plan_new(
                 const CurvePoint& planning_init_point,
                 double stop_s,
                 double target_speed);
 
-        void JMTPlanner::update(const std::vector<DynamicObjectXY>& dynamic_objects,
+        void update(const std::vector<DynamicObjectXY>& dynamic_objects,
                                 const CurvePoint& current_pose,
                                 const double dis_to_static_obstacle);
 

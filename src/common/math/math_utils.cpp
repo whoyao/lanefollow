@@ -15,15 +15,15 @@ namespace math {
 
 double Sqr(const double x) { return x * x; }
 
-double CrossProd(const Vec2d& start_point, const Vec2d& end_point_1,
-                 const Vec2d& end_point_2) {
-  return (end_point_1 - start_point).CrossProd(end_point_2 - start_point);
-}
-
-double InnerProd(const Vec2d& start_point, const Vec2d& end_point_1,
-                 const Vec2d& end_point_2) {
-  return (end_point_1 - start_point).InnerProd(end_point_2 - start_point);
-}
+//double CrossProd(const Vec2d& start_point, const Vec2d& end_point_1,
+//                 const Vec2d& end_point_2) {
+//  return (end_point_1 - start_point).CrossProd(end_point_2 - start_point);
+//}
+//
+//double InnerProd(const Vec2d& start_point, const Vec2d& end_point_1,
+//                 const Vec2d& end_point_2) {
+//  return (end_point_1 - start_point).InnerProd(end_point_2 - start_point);
+//}
 
 double CrossProd(const double x0, const double y0, const double x1,
                  const double y1) {
@@ -82,38 +82,38 @@ void RotateAxis(const double theta, const double x0, const double y0,
   *x1 = x0 * cos_theta - y0 * sin_theta;
   *y1 = x0 * sin_theta + y0 * cos_theta;
 }
-// Description:
-// Param:
-// Return:
-// Author: Huyao
-// Date: 2018/5/24 09:06
-bool twoVectorCross(const Vec2d &start1, const Vec2d &end1,
-                   const Vec2d &start2, const Vec2d &end2) {
+//// Description:
+//// Param:
+//// Return:
+//// Author: Huyao
+//// Date: 2018/5/24 09:06
+//bool twoVectorCross(const Vec2d &start1, const Vec2d &end1,
+//                   const Vec2d &start2, const Vec2d &end2) {
+//
+//  return ((bool)(CrossProd(start1,start2,end1)>0))^((bool)(CrossProd(start1,end2,end1)>0));
+//}
 
-  return ((bool)(CrossProd(start1,start2,end1)>0))^((bool)(CrossProd(start1,end2,end1)>0));
-}
-
-// Description:
-// Param:
-// Return:
-// Author: Huyao
-// Date: 2018/5/24 09:46
-Vec2d crossPoint(const Vec2d &start, const Vec2d &end,
-                  const Vec2d &out_point1, const Vec2d &out_point2) {
-  auto vector1 = end - start;
-  auto project_point1 = InnerProd(start, end, out_point1)/
-                        vector1.LengthSquare() * vector1 + start;
-  auto project_point2 = InnerProd(start, end, out_point2)/
-                        vector1.LengthSquare() * vector1 + start;
-
-  float d1 = out_point1.DistanceTo(project_point1);
-  float d2 = out_point2.DistanceTo(project_point2);
-
-  auto crossPoint = d1/(d1+d2)*project_point2 + d2/(d1+d2)*project_point1;
-
-  return crossPoint;
-
-}
+//// Description:
+//// Param:
+//// Return:
+//// Author: Huyao
+//// Date: 2018/5/24 09:46
+//Vec2d crossPoint(const Vec2d &start, const Vec2d &end,
+//                  const Vec2d &out_point1, const Vec2d &out_point2) {
+//  auto vector1 = end - start;
+//  auto project_point1 = InnerProd(start, end, out_point1)/
+//                        vector1.LengthSquare() * vector1 + start;
+//  auto project_point2 = InnerProd(start, end, out_point2)/
+//                        vector1.LengthSquare() * vector1 + start;
+//
+//  float d1 = out_point1.DistanceTo(project_point1);
+//  float d2 = out_point2.DistanceTo(project_point2);
+//
+//  auto crossPoint = d1/(d1+d2)*project_point2 + d2/(d1+d2)*project_point1;
+//
+//  return crossPoint;
+//
+//}
 
 }  // namespace math
 }  // namespace cyber_common

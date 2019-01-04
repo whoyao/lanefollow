@@ -8,8 +8,6 @@
 
 #include <array>
 
-#include "common/math/vec2d.h"
-
 namespace cyber_common {
 namespace math {
 
@@ -68,8 +66,6 @@ namespace CartesianFrenetConverter {
                                const double l, const double dl,
                                const double ddl);
 
-  cyber_common::math::Vec2d CalculateCartesianPoint(
-      const double rtheta, const cyber_common::math::Vec2d& rpoint, const double l);
   /**
    * @brief: given sl, theta, and road's theta, kappa, extract derivative l,
    *second order derivative l:

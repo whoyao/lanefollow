@@ -40,7 +40,7 @@
 #include <cmath>
 #include <algorithm>
 
-#include <tf/transform_datatypes.h>
+//#include <tf/transform_datatypes.h>
 
 #include "common/math/math_utils.h"
 
@@ -543,37 +543,37 @@ void nextPointCCS(double x_ccs, double kappa0, double dkappa, double& y_ccs, dou
   kappa_ccs = errorFactor * (dkappa * x_ccs + kappa0);
 }
 
-// transform PoseArray to CurvePoint
-// pub_path_curve = nh.advertise<geometry_msgs::PoseArray>("global_path_curve",10);
-std::vector<CurvePoint> CurveSmoother::transformToCurvePoint(const geometry_msgs::PoseArrayConstPtr poses_ptr) {
+//// transform PoseArray to CurvePoint
+//// pub_path_curve = nh.advertise<geometry_msgs::PoseArray>("global_path_curve",10);
+//std::vector<CurvePoint> CurveSmoother::transformToCurvePoint(const geometry_msgs::PoseArrayConstPtr poses_ptr) {
+//
+//  std::vector<CurvePoint> res;
+//  for(const auto one_pose : poses_ptr->poses) {
+//    CurvePoint cp;
+//    cp.x = one_pose.position.x;
+//    cp.y = one_pose.position.y;
+//    cp.theta = tf::getYaw(one_pose.orientation);
+//    res.push_back(std::move(cp));
+//  }
+//
+//  return res;
+//}
 
-  std::vector<CurvePoint> res;
-  for(const auto one_pose : poses_ptr->poses) {
-    CurvePoint cp;
-    cp.x = one_pose.position.x;
-    cp.y = one_pose.position.y;
-    cp.theta = tf::getYaw(one_pose.orientation);
-    res.push_back(std::move(cp));
-  }
-
-  return res;
-}
-
-// transform localtraj to CurvePoint
-// pub_path_curve = nh.advertise<geometry_msgs::PoseArray>("global_path_curve",10);
-    std::vector<CurvePoint> CurveSmoother::transformToCurvePoint(const tiggo_msgs::LocalTrajList* poses_ptr) {
-
-      std::vector<CurvePoint> res;
-      for(const auto one_pose : poses_ptr->points) {
-        CurvePoint cp;
-        cp.x = one_pose.position.x;
-        cp.y = one_pose.position.y;
-        cp.theta = one_pose.theta;
-        res.push_back(std::move(cp));
-      }
-
-      return res;
-    }
+//// transform localtraj to CurvePoint
+//// pub_path_curve = nh.advertise<geometry_msgs::PoseArray>("global_path_curve",10);
+//    std::vector<CurvePoint> CurveSmoother::transformToCurvePoint(const tiggo_msgs::LocalTrajList* poses_ptr) {
+//
+//      std::vector<CurvePoint> res;
+//      for(const auto one_pose : poses_ptr->points) {
+//        CurvePoint cp;
+//        cp.x = one_pose.position.x;
+//        cp.y = one_pose.position.y;
+//        cp.theta = one_pose.theta;
+//        res.push_back(std::move(cp));
+//      }
+//
+//      return res;
+//    }
 
 
 bool CurveSmoother::clothoideSpline(const std::vector<CurvePoint>& points_orig, double theta0_orig, double kappa0_orig, double s, int n_lookahead,

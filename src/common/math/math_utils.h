@@ -9,7 +9,7 @@
 #include <limits>
 #include <utility>
 
-#include "common/math/vec2d.h"
+//#include "common/math/vec2d.h"
 
 namespace cyber_common {
 namespace math {
@@ -25,8 +25,8 @@ double Sqr(const double x);
  *
  * @return The cross product result.
  */
-double CrossProd(const Vec2d &start_point, const Vec2d &end_point_1,
-                 const Vec2d &end_point_2);
+//double CrossProd(const Vec2d &start_point, const Vec2d &end_point_1,
+//                 const Vec2d &end_point_2);
 
 /**
  * @brief Inner product between two 2-D vectors from the common start point,
@@ -37,8 +37,8 @@ double CrossProd(const Vec2d &start_point, const Vec2d &end_point_1,
  *
  * @return The inner product result.
  */
-double InnerProd(const Vec2d &start_point, const Vec2d &end_point_1,
-                 const Vec2d &end_point_2);
+//double InnerProd(const Vec2d &start_point, const Vec2d &end_point_1,
+//                 const Vec2d &end_point_2);
 
 /**
  * @brief Cross product between two vectors.
@@ -163,8 +163,8 @@ void RotateAxis(const double theta, const double x0, const double y0,
  * @return true / false.
  * @Date: 2018/5/24 09:06
  */
-bool twoVectorCross(const Vec2d &start1, const Vec2d &end1,
-                     const Vec2d &start2, const Vec2d &end2);
+//bool twoVectorCross(const Vec2d &start1, const Vec2d &end1,
+//                     const Vec2d &start2, const Vec2d &end2);
 
 
 /**
@@ -176,8 +176,8 @@ bool twoVectorCross(const Vec2d &start1, const Vec2d &end1,
  * @return cross point vector.
  * @Date: 2018/5/24 09:06
  */
-Vec2d crossPoint(const Vec2d &start, const Vec2d &end,
-              const Vec2d &out_point1, const Vec2d &out_point2) ;
+//Vec2d crossPoint(const Vec2d &start, const Vec2d &end,
+//              const Vec2d &out_point1, const Vec2d &out_point2) ;
 }  // namespace math
 }  // namespace cyber_common
 

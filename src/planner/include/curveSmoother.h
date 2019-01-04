@@ -46,8 +46,8 @@
 #include <cstring>
 
 #include <common/struct/traj_structs.h>
-#include <geometry_msgs/PoseArray.h>
-#include "tiggo_msgs/LocalTrajList.h"
+//#include <geometry_msgs/PoseArray.h>
+//#include "tiggo_msgs/LocalTrajList.h"
 //#include <driving_common/Trajectory2D.h>
 
 namespace JMT {
@@ -87,8 +87,8 @@ public:
 public:
   void sample_as_bezier(int degree, int dense, std::vector<CurvePoint>& points, std::vector<CurvePoint>* splinepoints);
 
-  std::vector<CurvePoint> transformToCurvePoint(const geometry_msgs::PoseArrayConstPtr poses);
-  std::vector<CurvePoint> transformToCurvePoint(const tiggo_msgs::LocalTrajList* poses);
+//  std::vector<CurvePoint> transformToCurvePoint(const geometry_msgs::PoseArrayConstPtr poses);
+//  std::vector<CurvePoint> transformToCurvePoint(const tiggo_msgs::LocalTrajList* poses);
   bool clothoideSpline(const std::vector<CurvePoint>& points, double theta0, double kappa0, double s, int n_lookahead, std::vector<CurvePoint>& splinepoints);
   void sampleLinearEquidist(const std::vector<CurvePoint>& points, double point_dist, std::vector<CurvePoint>& linepoints);
 //    void sampleLinearEquidist(const std::vector<CurvePoint>& points, const std::vector<bool>& ignore, double point_dist, std::vector<CurvePoint>& linepoints);
