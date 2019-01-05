@@ -46,7 +46,7 @@ DEFINE_double(trajectory_time_resolution, 0.02,
 DEFINE_double(lattice_stop_buffer, 0.02,
               "The buffer before the stop s to check trajectories.");
 DEFINE_double(speed_lower_bound, -0.1, "The lowest speed allowed.");
-DEFINE_double(speed_upper_bound, 50.0/3.6, "The highest speed allowed.");
+DEFINE_double(speed_upper_bound, 30, "The highest speed allowed.");
 DEFINE_double(lateral_acceleration_bound, 4.0,
               "Bound of lateral acceleration; symmetric for left and right");
 DEFINE_double(weight_dist_travelled, 2.0, "Weight of travelled distance cost");

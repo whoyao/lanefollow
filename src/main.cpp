@@ -48,7 +48,7 @@ std::vector<DynamicObjectXY> get_dynamic_obstacle(std::vector<std::vector<double
     std::vector<DynamicObjectXY> res_vec;
     for (auto one : sensor_fusion) {
         DynamicObjectXY one_obstacle (one[1], one[2], std::sqrt(one[3]*one[3]+one[4]*one[4]), std::atan2(one[4], one[3]),
-                                        2.0, 2.0);
+                                        2.0, 1.5);
         res_vec.push_back(std::move(one_obstacle));
     }
     return res_vec;

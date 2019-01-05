@@ -314,7 +314,7 @@ namespace JMT {
             dy_object.half_length = object.half_length;
             dy_object.half_width = object.half_width;
 
-            dynamic_objects_sd_.push_back(std::move(dy_object));
+            dynamic_objects_sd_.emplace_back(dy_object);
         }
     }
 

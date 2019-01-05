@@ -18,6 +18,8 @@
 #include "common/math/cartesian_frenet_conversion.h"
 
 #define _PATH_ "/tmp/cost_fifo.pipe"
+#define _CAR_PATH_ "/tmp/car_fifo.pipe"
+
 
 
 namespace JMT {
@@ -31,51 +33,7 @@ namespace {
     }
 }
 
-    TrajectoryEvaluator::TrajectoryEvaluator(
-            const std::array<double, 3>& init_s,
-            const double stop_s,
-            const double dis_to_obstacle,
-            const double target_speed,
-            const std::vector<DynamicObject> &dynamic_objects_sd,
-            const TrajectorySets *ptr_trajectory_sets)
-            :  init_s_(init_s), dis_to_obstacle_(dis_to_obstacle),
-               stop_s_(stop_s), target_speed_(target_speed),
-               dynamic_objects_(dynamic_objects_sd) {
-
-        const double end_time = FLAGS_trajectory_time_length;
-
-       std::stringstream ss;
-
-        // if we have a stop point along the reference line,
-        // filter out the lon. trajectories that pass the stop point.
-        for (const auto& trajectory : *ptr_trajectory_sets) {
-            double lon_end_s = trajectory->Evaluate(0, end_time);
-            if (init_s[0] < stop_s &&
-                lon_end_s + FLAGS_lattice_stop_buffer > stop_s) {
-                continue;
-            }
-
-            if (!ConstraintChecker1d::IsValidLongitudinalTrajectory(*(trajectory))) {
-                continue;
-            }
-#ifdef JMT_DEBUG
-#ifdef JMT_VISUAL
-            std::pair<std::pair<std::vector<double>,double>,Result> cost_with_component
-                    = EvaluateDebug(trajectory, ss);  // TODO: update here
-#else
-            std::pair<std::pair<std::vector<double>,double>,Result> cost_with_component
-                    = Evaluate2(trajectory);  // TODO: update here
-#endif
-            cost_queue_with_components_.emplace(std::make_pair(
-                    std::make_pair(trajectory,cost_with_component.first),
-                    cost_with_component.second));
-#else
-            std::pair<double,Result> cost = Evaluate(stop_s, target_speed, dis_to_obstacle, trajectory);
-            cost_queue_.emplace(std::make_pair(std::make_pair(trajectory, cost.first),cost.second));
-#endif
-        }
-
-#ifdef JMT_VISUAL
+    void cost_pipe(std::stringstream &ss){
         static bool fifo_exist = false;
         char buf[4096];
 
@@ -107,6 +65,100 @@ namespace {
                 }
             }
         }
+    }
+
+    void car_pipe(std::stringstream &ss){
+        static bool fifo_exist = false;
+        char buf[4096];
+
+        if(!fifo_exist) {
+            if(mkfifo(_CAR_PATH_, 0666 | S_IFIFO)){
+                AERROR << "FIFO create error!";
+            }
+            fifo_exist = true;
+        }
+        else {
+            int fd = open(_CAR_PATH_, O_RDONLY|O_NONBLOCK);
+            if(fd < 0){
+                AERROR << "FIFO open error!";
+            } else {
+                read(fd, buf, sizeof(buf));
+                close(fd);
+            }
+
+
+            int fd2 = open(_CAR_PATH_, O_WRONLY|O_NONBLOCK);
+            if(fd2 < 0){
+                AERROR << "FIFO open error!";
+            } else {
+
+                if(write(fd2, ss.str().c_str(), strlen(ss.str().c_str())+1) < 0){
+                    AERROR << "FIFO write error!";
+                } else {
+                    close(fd2);
+                }
+            }
+        }
+    }
+
+    TrajectoryEvaluator::TrajectoryEvaluator(
+            const std::array<double, 3>& init_s,
+            const double stop_s,
+            const double dis_to_obstacle,
+            const double target_speed,
+            const std::vector<DynamicObject> &dynamic_objects_sd,
+            const TrajectorySets *ptr_trajectory_sets)
+            :  init_s_(init_s), dis_to_obstacle_(dis_to_obstacle),
+               stop_s_(stop_s), target_speed_(target_speed),
+               dynamic_objects_(dynamic_objects_sd) {
+
+        const double end_time = FLAGS_trajectory_time_length;
+
+        std::stringstream ss;
+        // if we have a stop point along the reference line,
+        // filter out the lon. trajectories that pass the stop point.
+        for (const auto& trajectory : *ptr_trajectory_sets) {
+            double lon_end_s = trajectory->Evaluate(0, end_time);
+            if (init_s[0] < stop_s &&
+                lon_end_s + FLAGS_lattice_stop_buffer > stop_s) {
+                continue;
+            }
+
+            if (!ConstraintChecker1d::IsValidLongitudinalTrajectory(*(trajectory))) {
+                continue;
+            }
+#ifdef JMT_DEBUG
+/////output cost value
+#ifdef JMT_VISUAL
+
+            std::pair<std::pair<std::vector<double>,double>,Result> cost_with_component
+                    = EvaluateDebug(trajectory, ss);  // TODO: update here
+#else
+            std::pair<std::pair<std::vector<double>,double>,Result> cost_with_component
+                    = Evaluate2(trajectory);  // TODO: update here
+#endif
+            cost_queue_with_components_.emplace(std::make_pair(
+                    std::make_pair(trajectory,cost_with_component.first),
+                    cost_with_component.second));
+#else
+            std::pair<double,Result> cost = Evaluate(stop_s, target_speed, dis_to_obstacle, trajectory);
+            cost_queue_.emplace(std::make_pair(std::make_pair(trajectory, cost.first),cost.second));
+#endif
+        }
+
+#ifdef JMT_VISUAL
+        cost_pipe(ss);
+        std::stringstream ss_car;
+        ss_car << init_s[0] << ";" << init_s[1] << ";" << init_s[2] << ";" << -6.0 << ";"
+               << 0.0 << ";" << 0.0 << ";" << 1.5 << ";" << 2.0
+               << std::endl;
+        for(const auto &obstacle : dynamic_objects_sd){
+            ss_car << obstacle.S[0] << ";" << obstacle.S[1] << ";" << obstacle.S[2] << ";" << obstacle.D[0] << ";"
+             << obstacle.D[1] << ";" << obstacle.D[2] << ";" << obstacle.half_width << ";" << obstacle.half_length
+                                                                                           << std::endl;
+        }
+        AWARN << ss_car.str();
+        car_pipe(ss_car);
 #endif
 
         ADEBUG << "Number of valid 1d trajectory pairs: " << cost_queue_.size();
@@ -190,9 +242,11 @@ namespace {
 
         double speed_cost = logistic(delta_speed, 10);
         double dist_travelled_cost = logistic(delta_dist, 100);
+
         ss << dist_s << ";" << end_v << ";" << speed_cost << ";" << dist_travelled_cost << ";" <<
              (speed_cost * FLAGS_weight_target_speed + dist_travelled_cost * FLAGS_weight_dist_travelled) /
              (FLAGS_weight_target_speed + FLAGS_weight_dist_travelled) << std::endl;
+
         return (speed_cost * FLAGS_weight_target_speed +
                 dist_travelled_cost * FLAGS_weight_dist_travelled) /
                (FLAGS_weight_target_speed + FLAGS_weight_dist_travelled);
@@ -217,10 +271,10 @@ namespace {
             result = Result::LON_DYNAMIC_COLLISION;
         }
 
-        double lon_objective_cost =
-                LonObjectiveCostDebug(lon_trajectory, target_speed_, ss);
 //        double lon_objective_cost =
-//                LonObjectiveCost(lon_trajectory, target_speed_);
+//                LonObjectiveCostDebug(lon_trajectory, target_speed_, ss);
+        double lon_objective_cost =
+                LonObjectiveCost(lon_trajectory, target_speed_);
 
 //        double lon_jerk_cost = LonComfortCost(lon_trajectory);
         double lon_jerk_cost = 0.0;
@@ -230,6 +284,10 @@ namespace {
 
 
         std::vector<double> res_vec = {lon_objective_cost, lon_jerk_cost, collision_cost, centripetal_acc_cost};
+
+        ss << lon_trajectory->Evaluate(0, lon_trajectory->ParamLength()) - lon_trajectory->Evaluate(0, 0.0)
+           << ";" << lon_trajectory->Evaluate(1, lon_trajectory->ParamLength()) << ";" << lon_objective_cost
+           << ";" << collision_cost << std::endl;
 
 
         return std::make_pair(std::make_pair(res_vec, lon_objective_cost * FLAGS_weight_lon_objective +
