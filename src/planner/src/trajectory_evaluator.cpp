@@ -9,8 +9,15 @@
 #include <functional>
 #include <limits>
 #include <utility>
+#include <fstream>
+#include <sstream>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
 
 #include "common/math/cartesian_frenet_conversion.h"
+
+#define _PATH_ "/tmp/cost_fifo.pipe"
 
 
 namespace JMT {
@@ -37,6 +44,7 @@ namespace {
 
         const double end_time = FLAGS_trajectory_time_length;
 
+       std::stringstream ss;
 
         // if we have a stop point along the reference line,
         // filter out the lon. trajectories that pass the stop point.
@@ -51,8 +59,13 @@ namespace {
                 continue;
             }
 #ifdef JMT_DEBUG
+#ifdef JMT_VISUAL
             std::pair<std::pair<std::vector<double>,double>,Result> cost_with_component
-                    = Evaluate2(trajectory);
+                    = EvaluateDebug(trajectory, ss);  // TODO: update here
+#else
+            std::pair<std::pair<std::vector<double>,double>,Result> cost_with_component
+                    = Evaluate2(trajectory);  // TODO: update here
+#endif
             cost_queue_with_components_.emplace(std::make_pair(
                     std::make_pair(trajectory,cost_with_component.first),
                     cost_with_component.second));
@@ -61,6 +74,40 @@ namespace {
             cost_queue_.emplace(std::make_pair(std::make_pair(trajectory, cost.first),cost.second));
 #endif
         }
+
+#ifdef JMT_VISUAL
+        static bool fifo_exist = false;
+        char buf[4096];
+
+        if(!fifo_exist) {
+            if(mkfifo(_PATH_, 0666 | S_IFIFO)){
+                AERROR << "FIFO create error!";
+            }
+            fifo_exist = true;
+        }
+        else {
+            int fd = open(_PATH_, O_RDONLY|O_NONBLOCK);
+            if(fd < 0){
+                AERROR << "FIFO open error!";
+            } else {
+                read(fd, buf, sizeof(buf));
+                close(fd);
+            }
+
+
+            int fd2 = open(_PATH_, O_WRONLY|O_NONBLOCK);
+            if(fd2 < 0){
+                AERROR << "FIFO open error!";
+            } else {
+
+                if(write(fd2, ss.str().c_str(), strlen(ss.str().c_str())+1) < 0){
+                    AERROR << "FIFO write error!";
+                } else {
+                    close(fd2);
+                }
+            }
+        }
+#endif
 
         ADEBUG << "Number of valid 1d trajectory pairs: " << cost_queue_.size();
 
@@ -128,6 +175,71 @@ namespace {
 }
 #endif
 
+
+    double LonObjectiveCostDebug(
+            const PtrTrajectory1d& lon_trajectory,
+            const double target_speed, std::stringstream &ss ) {
+        double t_max = lon_trajectory->ParamLength();
+        double dist_s =
+                lon_trajectory->Evaluate(0, t_max) - lon_trajectory->Evaluate(0, 0.0);
+
+        double end_v = lon_trajectory->Evaluate(1, t_max);
+        double delta_speed = std::fabs(target_speed-end_v);
+        double delta_dist = std::max(0.0, 100 - dist_s);
+
+
+        double speed_cost = logistic(delta_speed, 10);
+        double dist_travelled_cost = logistic(delta_dist, 100);
+        ss << dist_s << ";" << end_v << ";" << speed_cost << ";" << dist_travelled_cost << ";" <<
+             (speed_cost * FLAGS_weight_target_speed + dist_travelled_cost * FLAGS_weight_dist_travelled) /
+             (FLAGS_weight_target_speed + FLAGS_weight_dist_travelled) << std::endl;
+        return (speed_cost * FLAGS_weight_target_speed +
+                dist_travelled_cost * FLAGS_weight_dist_travelled) /
+               (FLAGS_weight_target_speed + FLAGS_weight_dist_travelled);
+    }
+
+    std::pair<std::pair<std::vector<double>,double>,Result> TrajectoryEvaluator::EvaluateDebug(
+            const PtrTrajectory1d& lon_trajectory, std::stringstream &ss) const {
+        // Costs:
+        // 1. Cost of collision on static obstacles.
+        // 2. Cost of missing the objective, e.g., cruise, stop, etc.
+        // 3. Cost of logitudinal jerk
+        // 4. Cost of logitudinal collision
+
+        Result result = Result::VALID;
+
+        // Cost of collision on  obstacle
+        double collision_cost_signed = LonCollisionCost(lon_trajectory);
+        double collision_cost = std::fabs(collision_cost_signed);
+        if(collision_cost_signed < -std::numeric_limits<double>::epsilon()){
+            result = Result::LON_STATIC_COLLISION;
+        } else if(collision_cost_signed > std::numeric_limits<double>::epsilon()){
+            result = Result::LON_DYNAMIC_COLLISION;
+        }
+
+        double lon_objective_cost =
+                LonObjectiveCostDebug(lon_trajectory, target_speed_, ss);
+//        double lon_objective_cost =
+//                LonObjectiveCost(lon_trajectory, target_speed_);
+
+//        double lon_jerk_cost = LonComfortCost(lon_trajectory);
+        double lon_jerk_cost = 0.0;
+
+//        double centripetal_acc_cost = CentripetalAccelerationCost(lon_trajectory);
+        double centripetal_acc_cost = 0.0;
+
+
+        std::vector<double> res_vec = {lon_objective_cost, lon_jerk_cost, collision_cost, centripetal_acc_cost};
+
+
+        return std::make_pair(std::make_pair(res_vec, lon_objective_cost * FLAGS_weight_lon_objective +
+                                                      lon_jerk_cost * FLAGS_weight_lon_jerk +
+                                                      std::fabs(collision_cost) * FLAGS_weight_lon_collision +
+                                                      centripetal_acc_cost * FLAGS_weight_centripetal_acceleration),
+                              Result::VALID);
+
+    }
+
     std::pair<std::pair<std::vector<double>,double>,Result> TrajectoryEvaluator::Evaluate2(
             const PtrTrajectory1d& lon_trajectory) const {
         // Costs:
@@ -157,7 +269,7 @@ namespace {
         double centripetal_acc_cost = 0.0;
 
 
-        std::vector<double> res_vec = {lon_objective_cost, lon_jerk_cost, collision_cost*FLAGS_weight_lon_collision, centripetal_acc_cost};
+        std::vector<double> res_vec = {lon_objective_cost, lon_jerk_cost, collision_cost, centripetal_acc_cost};
 
 
         return std::make_pair(std::make_pair(res_vec, lon_objective_cost * FLAGS_weight_lon_objective +
@@ -216,6 +328,7 @@ namespace {
     }
 
 
+
     double TrajectoryEvaluator::LonObjectiveCost(
             const PtrTrajectory1d& lon_trajectory,
             const double target_speed ) const {
@@ -225,11 +338,11 @@ namespace {
 
         double end_v = lon_trajectory->Evaluate(1, t_max);
         double delta_speed = std::fabs(target_speed-end_v);
-        double delta_dist = std::max(0.0, 30 - dist_s);
+        double delta_dist = std::max(0.0, 100 - dist_s);
 
 
-        double speed_cost = logistic(delta_speed, 5);
-        double dist_travelled_cost = logistic(delta_dist, 30);
+        double speed_cost = logistic(delta_speed, 10);
+        double dist_travelled_cost = logistic(delta_dist, 100);
         return (speed_cost * FLAGS_weight_target_speed +
                 dist_travelled_cost * FLAGS_weight_dist_travelled) /
                (FLAGS_weight_target_speed + FLAGS_weight_dist_travelled);

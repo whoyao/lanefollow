@@ -368,6 +368,7 @@ namespace JMT {
             auto combined_trajectory = TrajectoryCombiner::Combine1d(
                     topology_manager_, *trajectory_pair, 0.0);
 
+            AERROR << "end_s: " << combined_trajectory.back().s << ", end_v: " << combined_trajectory.back().v;
             return combined_trajectory;
         }
 
@@ -448,14 +449,14 @@ namespace JMT {
                 debug_res = combined_trajectory;
             }
 
-            std::stringstream ss;
-            ss << cnt << "-" << cost_component[0] << "-" << cost_component[1] << "-" << cost_component[2] << "-" << cost_component[3] << ".txt";
-            std::ofstream fout(ss.str());
-            for(const auto &point : combined_trajectory){
-                fout << point.x << ";" << point.y << std::endl;
-            }
-            fout.close();
-            cnt++;
+//            std::stringstream ss;
+//            ss << "text/" << cnt << "-" << cost_component[0] << "-" << cost_component[1] << "-" << cost_component[2] << "-" << cost_component[3] << ".txt";
+//            std::ofstream fout(ss.str());
+//            for(const auto &point : combined_trajectory){
+//                fout << point.x << ";" << point.y << std::endl;
+//            }
+//            fout.close();
+//            cnt++;
 //                    return res;
         }
         return debug_res; // TODO: remove

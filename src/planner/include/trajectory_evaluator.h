@@ -7,6 +7,7 @@
 
 
 #define JMT_DEBUG
+#define JMT_VISUAL
 
 
 #include <array>
@@ -83,6 +84,9 @@ namespace JMT {
 
         std::pair<std::pair<std::vector<double>,double>,Result>  Evaluate2(
                 const std::shared_ptr<PolynomialCurve1d>& lon_trajectory) const;
+
+        std::pair<std::pair<std::vector<double>,double>,Result>  EvaluateDebug(
+                const std::shared_ptr<PolynomialCurve1d>& lon_trajectory, std::stringstream &ss) const;
 
         double LonComfortCost(const std::shared_ptr<PolynomialCurve1d>& lon_trajectory) const;
 

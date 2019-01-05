@@ -164,7 +164,7 @@ int main () {
                                 int indx_on_last_path = MatchPointInCurvePointList(temp_point, last_path);
                                 planning_init_point = last_path[indx_on_last_path];
                             }
-                            auto new_path = planner.plan_debug(planning_init_point, std::numeric_limits<double>::infinity(), 20);
+                            auto new_path = planner.plan_new(planning_init_point, std::numeric_limits<double>::infinity(), 20);
 
 /*
                             for(const auto & a_traj : all_trajectory_Frenet) {
