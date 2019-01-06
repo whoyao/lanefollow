@@ -338,7 +338,7 @@ namespace JMT {
                 init_s, delta_t, stop_s, dis_to_static_obstacle_, target_speed,
                 dynamic_objects_sd_, &trajectory_sets);
 
-        AWARN << "Total trajectories number: " << trajectory_evaluator.num_of_trajectory_pairs();
+//        AWARN << "Total trajectories number: " << trajectory_evaluator.num_of_trajectory_pairs();
 
         std::size_t sd_dynamic_collision_failure_count = 0;
         std::size_t sd_static_collision_failure_count = 0;
@@ -369,7 +369,7 @@ namespace JMT {
             auto combined_trajectory = TrajectoryCombiner::Combine1d(
                     topology_manager_, *trajectory_pair, 0.0);
 
-            AERROR << "end_s: " << combined_trajectory.back().s << ", end_v: " << combined_trajectory.back().v;
+//            AERROR << "end_s: " << combined_trajectory.back().s << ", end_v: " << combined_trajectory.back().v;
             return combined_trajectory;
         }
 

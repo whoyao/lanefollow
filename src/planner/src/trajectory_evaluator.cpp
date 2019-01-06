@@ -459,6 +459,9 @@ namespace {
         double last_s = -FLAGS_lattice_epsilon;
         double t_param = 0.0;
 
+        double min_delta_s = std::numeric_limits<double>::infinity();
+        double min_delta_d = std::numeric_limits<double>::infinity();
+        double min_delta_sqrt = std::numeric_limits<double>::infinity();
         // origin method, influenced by resolution
         for (double t = 0.0; t < FLAGS_trajectory_time_length;
              t += FLAGS_trajectory_time_resolution) {
@@ -475,7 +478,7 @@ namespace {
 
             // linear extrapolation is handled internally in LatticeTrajectory1d;
             // no worry about s_param > lat_trajectory.ParamLength() situation
-            double d = 0.0;
+            double d = FLAGS_car_default_d;
 
             double object_s, object_d, delta_s, delta_d;
             for(const auto &object : dynamic_objects_){
@@ -483,32 +486,62 @@ namespace {
                 object_d = (object.D)[0] + (object.D)[1]*(t+delta_t_);
                 delta_s = object_s - s;
                 delta_d = object_d - d;
-                if((delta_s)*(delta_s)+(delta_d)*(delta_d) <
-                   object.half_length*object.half_length + object.half_width*object.half_width
-                   + FLAGS_radius_safe_dis*FLAGS_radius_safe_dis){
-                    return 0.0;
+                double sqrt = delta_d*delta_d+delta_s*delta_s;
+                if(sqrt < min_delta_sqrt){
+                    min_delta_sqrt = sqrt;
+                    min_delta_d = delta_d;
+                    min_delta_s = delta_s;
                 }
+                if(std::fabs(delta_s) < (FLAGS_half_car_length + object.half_length) &&
+                        std::fabs(delta_d) < (FLAGS_half_car_width + object.half_width)) {
+                    if((object.S[0] + object.S[1]*delta_t_) < init_s_[0]){
+                        continue;
+                    }
+                    AERROR << "Collision: " << "dis_s: " << lon_trajectory->Evaluate(0, lon_trajectory->ParamLength()) - lon_trajectory->Evaluate(0, 0.0)
+                           << ", vel: " << lon_trajectory->Evaluate(1, lon_trajectory->ParamLength()) << ", current_t: " << t
+                           << ", delta_s: " << delta_s << ", delta_d: " << delta_d << ", our s: " << init_s_[0]
+                           << ", object_s: " << object.S[0] << ", object_d: " << object.D[0];
+                    return 1.0;
+                }
+
+//
+//                if((delta_s)*(delta_s)+(delta_d)*(delta_d) <
+//                   object.half_length*object.half_length + object.half_width*object.half_width
+//                   + FLAGS_radius_safe_dis*FLAGS_radius_safe_dis){
+//                    return 1.0;
+//                }
             }
         }
+        AERROR << "No collision: " << "dis_s: " << lon_trajectory->Evaluate(0, lon_trajectory->ParamLength()) - lon_trajectory->Evaluate(0, 0.0)
+               << ", vel: " << lon_trajectory->Evaluate(1, lon_trajectory->ParamLength()) << ", min_s: " << min_delta_s
+               << ", min_d: " << min_delta_d ;
 
-        // my new method
-        for(const auto &object : dynamic_objects_){
-            double dis_s = object.S[0] + object.S[1]*delta_t_ - (init_s_[0] + FLAGS_origin_to_center);
-            double fix_dis_s = dis_s - std::copysign(FLAGS_half_car_length + object.half_length, dis_s);
-            double collsion_t;
-            if(std::signbit(fix_dis_s) != std::signbit(dis_s)){
-                collsion_t = 0.0;
-            } else {
-                collsion_t = fix_dis_s/(init_s_[1] - object.S[1]);
-            }
-
-            if(collsion_t > -std::numeric_limits<double>::epsilon() && collsion_t <= FLAGS_trajectory_time_length){
-                double object_d = (object.D)[0] + (object.D)[1]*(collsion_t+delta_t_);
-                if(std::fabs(object_d - FLAGS_car_default_d) < (FLAGS_half_car_width + object.half_width)){
-                    return 1.5;
-                }
-            }
-        }
+//        // my new method
+//        int cnt = 0;
+//        for(const auto &object : dynamic_objects_){
+//            double dis_s = object.S[0] + object.S[1]*delta_t_ - (init_s_[0] + FLAGS_origin_to_center);
+//            double fix_dis_s = dis_s - std::copysign(FLAGS_half_car_length + object.half_length, dis_s);
+//            double collsion_t;
+//            if(std::signbit(fix_dis_s) != std::signbit(dis_s)){
+//                collsion_t = 0.0;
+//            } else {
+//                collsion_t = fix_dis_s/(init_s_[1] - object.S[1]);
+//            }
+//
+//            double temp_offset = std::fabs(( object.D )[0] + ( object.D )[1] * ( collsion_t + delta_t_ ) - FLAGS_car_default_d);
+//            if(collsion_t > -std::numeric_limits<double>::epsilon() && collsion_t <= 20.0 &&
+//                    temp_offset < (FLAGS_half_car_width + object.half_width)) {
+//                AERROR << cnt << ">> collision_t: " << collsion_t << ", offset: "
+//                       << temp_offset << ", fix_dis: " << fix_dis_s << ", Ve: " << init_s_[1] << ", Vo: " << object.S[1];
+//            }
+//            cnt++;
+//            if(collsion_t > -std::numeric_limits<double>::epsilon() && collsion_t <= FLAGS_trajectory_time_length){
+//                double object_d = (object.D)[0] + (object.D)[1]*(collsion_t+delta_t_);
+//                if(std::fabs(object_d - FLAGS_car_default_d) < (FLAGS_half_car_width + object.half_width)){
+//                    return 1.5;
+//                }
+//            }
+//        }
 
         return 0.0;
     }
