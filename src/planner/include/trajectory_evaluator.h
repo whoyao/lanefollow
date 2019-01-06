@@ -57,6 +57,7 @@ namespace JMT {
     public:
         explicit TrajectoryEvaluator(
                 const std::array<double, 3>& init_s,
+                double delta_t,
                 double stop_s,
                 double dis_to_obstacle,
                 double target_speed,
@@ -134,6 +135,8 @@ namespace JMT {
         std::array<double, 3> init_s_;
 
         CurvePoint planning_init_point_;
+
+        double delta_t_;
 
         double stop_s_;
 

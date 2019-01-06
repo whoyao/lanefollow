@@ -139,7 +139,7 @@ namespace JMT {
 
         // linear extrapolation is handled internally in LatticeTrajectory1d;
         // no worry about s_param > lat_trajectory.ParamLength() situation
-        double d = -6.0;
+        double d = FLAGS_car_default_d;
         double d_prime = 0.0;
         double d_pprime = 0.0;
 

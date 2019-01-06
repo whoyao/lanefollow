@@ -319,6 +319,7 @@ namespace JMT {
     }
 
     std::vector<CurvePoint> JMTPlanner::plan_new(const CurvePoint& planning_init_point,
+                                                   const double delta_t,
                                                    const double stop_s,
                                                    const double target_speed) {
 
@@ -334,7 +335,7 @@ namespace JMT {
                                                        &trajectory_sets);
 
         TrajectoryEvaluator trajectory_evaluator(
-                init_s, stop_s, dis_to_static_obstacle_, target_speed,
+                init_s, delta_t, stop_s, dis_to_static_obstacle_, target_speed,
                 dynamic_objects_sd_, &trajectory_sets);
 
         AWARN << "Total trajectories number: " << trajectory_evaluator.num_of_trajectory_pairs();
@@ -383,6 +384,7 @@ namespace JMT {
     // TODO : dynamic car transform, lane position, grid_map_check;
     std::vector<CurvePoint> JMTPlanner::plan_debug(
             const CurvePoint& planning_init_point,
+            const double delta_t,
             const double stop_s,
             const double target_speed) {
 
@@ -400,7 +402,7 @@ namespace JMT {
                                                        &trajectory_sets);
 
         TrajectoryEvaluator trajectory_evaluator(
-                init_s, stop_s, dis_to_static_obstacle_, target_speed,
+                init_s, delta_t, stop_s, dis_to_static_obstacle_, target_speed,
                 dynamic_objects_sd_, &trajectory_sets);
 
         AWARN << "Total trajectories number: " << trajectory_evaluator.num_of_trajectory_pairs();

@@ -103,13 +103,14 @@ namespace {
 
     TrajectoryEvaluator::TrajectoryEvaluator(
             const std::array<double, 3>& init_s,
+            const double delta_t,
             const double stop_s,
             const double dis_to_obstacle,
             const double target_speed,
             const std::vector<DynamicObject> &dynamic_objects_sd,
             const TrajectorySets *ptr_trajectory_sets)
             :  init_s_(init_s), dis_to_obstacle_(dis_to_obstacle),
-               stop_s_(stop_s), target_speed_(target_speed),
+               stop_s_(stop_s), delta_t_(delta_t), target_speed_(target_speed),
                dynamic_objects_(dynamic_objects_sd) {
 
         const double end_time = FLAGS_trajectory_time_length;
@@ -157,7 +158,7 @@ namespace {
              << obstacle.D[1] << ";" << obstacle.D[2] << ";" << obstacle.half_width << ";" << obstacle.half_length
                                                                                            << std::endl;
         }
-        AWARN << ss_car.str();
+//        AWARN << ss_car.str();
         car_pipe(ss_car);
 #endif
 
@@ -457,6 +458,8 @@ namespace {
         double s0 = lon_trajectory->Evaluate(0, 0.0);
         double last_s = -FLAGS_lattice_epsilon;
         double t_param = 0.0;
+
+        // origin method, influenced by resolution
         for (double t = 0.0; t < FLAGS_trajectory_time_length;
              t += FLAGS_trajectory_time_resolution) {
 
@@ -476,8 +479,8 @@ namespace {
 
             double object_s, object_d, delta_s, delta_d;
             for(const auto &object : dynamic_objects_){
-                object_s = (object.S)[0] + (object.S)[1]*t;
-                object_d = (object.D)[0] + (object.D)[1]*t;
+                object_s = (object.S)[0] + (object.S)[1]*(t+delta_t_);
+                object_d = (object.D)[0] + (object.D)[1]*(t+delta_t_);
                 delta_s = object_s - s;
                 delta_d = object_d - d;
                 if((delta_s)*(delta_s)+(delta_d)*(delta_d) <
@@ -487,6 +490,9 @@ namespace {
                 }
             }
         }
+
+        // my new method
+
         return 0.0;
     }
 

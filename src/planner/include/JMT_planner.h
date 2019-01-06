@@ -45,16 +45,19 @@ namespace JMT {
 
         std::vector<CurvePoint> plan (
                 const CurvePoint& planning_init_point,
+                double delta_t,
                 double stop_s,
                 double target_speed);
 
         std::vector<CurvePoint> plan_debug (
                 const CurvePoint& planning_init_point,
+                double delta_t,
                 double stop_s,
                 double target_speed);
 
         std::vector<CurvePoint> plan_new(
                 const CurvePoint& planning_init_point,
+                double delta_t,
                 double stop_s,
                 double target_speed);
 

@@ -5,9 +5,18 @@
 
 #include "JMT_gflags.h"
 
+
+// no lane change
+DEFINE_double(car_default_d, -6.0,
+"Default d position of car");
+
 // safaty
 DEFINE_double(head_offset, 3.94,
 "Distance between bumper and origin");
+DEFINE_double(rear_to_center, 0.0,
+"Half distance of front wheel to rear wheel");
+DEFINE_double(bumper_to_front, 2.0,
+"Distance front front wheel to bumper");
 
 DEFINE_int32(num_velocity_sample, 6,
 "The number of velocity samples in end condition sampler.");

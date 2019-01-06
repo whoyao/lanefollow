@@ -8,8 +8,14 @@
 
 #include "gflags/gflags.h"
 
+
+// no lane change
+DECLARE_double(car_default_d);
+
 // safaty
 DECLARE_double(head_offset);
+DECLARE_double(rear_to_center);
+DECLARE_double(bumper_to_front);
 
 // end sample
 DECLARE_int32(num_velocity_sample);
