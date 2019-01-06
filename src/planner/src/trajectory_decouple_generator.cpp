@@ -200,12 +200,12 @@ namespace JMT {
 
     void Trajectory1dGenerator::GenerateTrajectorySets(
             double stop_s,
-            double dis_to_static_obstacle,
+            double dis_to_obstacle,
             double target_speed,
             TrajectorySets* ptr_trajectory_sets) const{
-      if(dis_to_static_obstacle < std::numeric_limits<double>::infinity()) {
+      if(dis_to_obstacle < std::numeric_limits<double>::infinity()) {
         GenerateSpeedProfilesForStopping(std::min(
-                std::max(init_lon_state_[0] + dis_to_static_obstacle - FLAGS_head_offset, init_lon_state_[0]),
+                std::max(init_lon_state_[0] + dis_to_obstacle - FLAGS_head_offset, init_lon_state_[0]),
                 stop_s), ptr_trajectory_sets);
       } else if(stop_s < std::numeric_limits<double>::infinity()) {
         GenerateSpeedProfilesForStopping(stop_s, ptr_trajectory_sets);

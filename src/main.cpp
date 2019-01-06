@@ -151,21 +151,53 @@ int main () {
 //                            }
 
                             int last_index = min(prev_size, PREVIOUS_POINTS_TO_KEEP);
+                            int index_end_on_last_path = 0;
+                            int index_start_on_last_path = 0;
+
+                            if(last_index > 0) {
+                                CurvePoint temp_point;
+                                temp_point.x = previous_path_x[last_index];
+                                temp_point.y = previous_path_y[last_index];
+                                index_end_on_last_path = MatchPointInCurvePointList(temp_point, last_path);
+                                temp_point.x = previous_path_x[0];
+                                temp_point.y = previous_path_y[0];
+                                index_start_on_last_path = MatchPointInCurvePointList(temp_point, last_path);
+                            }
                             double delta_t = last_index * FLAGS_trajectory_time_resolution;
 
-                            CurvePoint planning_init_point;
-                            if(last_index < 5 || last_path.empty()) {
-                                planning_init_point = current_pose;
+                            std::vector<CurvePoint> previous_path;
+                            previous_path.assign(std::min(last_path.begin()+index_start_on_last_path, last_path.end()),
+                                                 std::min(last_path.begin()+index_end_on_last_path, last_path.end()));
+//
+//                            // keep 10 points in front of our car, make sure the path is smooth
+//                            for (int i = 0; i < last_index; i++) {
+//                                CurvePoint cp;
+//                                cp.x =
+//                                next_x_vals.emplace_back(previous_path_x[i]);
+//                                next_y_vals.emplace_back(previous_path_y[i]);
+//                            }
+
+                            std::vector<CurvePoint> new_path;
+
+                            if(last_index >= 5 && !planner.is_keep_path_validated(previous_path)) {
+                                AERROR << "Emergency1!!!";
+                                new_path = planner.plan_emergency_path(current_pose, std::numeric_limits<double>::infinity());  // TODO: inf is temp
                             } else {
-                                CurvePoint temp_point;
-                                double x = previous_path_x[last_index];
-                                double y = previous_path_y[last_index];
-                                temp_point.x = x;
-                                temp_point.y = y;
-                                int indx_on_last_path = MatchPointInCurvePointList(temp_point, last_path);
-                                planning_init_point = last_path[indx_on_last_path];
+                                CurvePoint planning_init_point;
+                                if (last_index < 5 || last_path.empty() || previous_path.empty()) {
+                                    planning_init_point = current_pose;
+                                } else {
+                                    planning_init_point = last_path[index_end_on_last_path];
+                                }
+                                new_path = planner.plan_new(planning_init_point, delta_t,
+                                                            std::numeric_limits<double>::infinity(), 20);   // TODO: same as above
+
+                                if(new_path.empty()){
+                                    AERROR << "Emergency2!!!";
+                                    new_path = planner.plan_emergency_path(current_pose, std::numeric_limits<double>::infinity());  // TODO: inf is temp
+                                }
                             }
-                            auto new_path = planner.plan_new(planning_init_point, delta_t, std::numeric_limits<double>::infinity(), 20);
+                            AERROR << "Path Size: " << new_path.size() ;
 
 /*
                             for(const auto & a_traj : all_trajectory_Frenet) {
@@ -195,10 +227,14 @@ int main () {
                                 next_y_vals.emplace_back(point_xy_2d.y);
                             }
 
-
-
-
                             last_path = new_path;
+
+                            ofstream fout("path.txt");
+                            for(const auto& point : new_path) {
+                                fout <<  point.s << ";" << point.x << ";" << point.y << std::endl;
+                            }
+                            fout.close();
+
                             /*********************************** END OF MY CODE ****************************************/
 
                             json msgJson;

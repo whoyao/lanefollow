@@ -47,19 +47,25 @@ namespace JMT {
                 const CurvePoint& planning_init_point,
                 double delta_t,
                 double stop_s,
-                double target_speed);
+                double target_speed) const;
 
         std::vector<CurvePoint> plan_debug (
                 const CurvePoint& planning_init_point,
                 double delta_t,
                 double stop_s,
-                double target_speed);
+                double target_speed) const;
 
         std::vector<CurvePoint> plan_new(
                 const CurvePoint& planning_init_point,
                 double delta_t,
                 double stop_s,
-                double target_speed);
+                double target_speed) const;
+
+        std::vector<CurvePoint> plan_emergency_path(
+                const CurvePoint& planning_init_point,
+                double stop_s) const;
+
+        bool is_keep_path_validated(const std::vector<CurvePoint>& keep_path) const;
 
         void update(const std::vector<DynamicObjectXY>& dynamic_objects,
                                 const CurvePoint& current_pose,

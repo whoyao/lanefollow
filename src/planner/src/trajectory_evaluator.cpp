@@ -200,7 +200,7 @@ namespace {
 #ifdef JMT_DEBUG
         Result res = cost_queue_with_components_.top().second;
         if(res != Result::VALID){
-            cost_queue_.pop();
+            cost_queue_with_components_.pop();
         }
         return res;
 #else
@@ -228,6 +228,65 @@ namespace {
 }
 #endif
 
+    TrajectoryEvaluator::TrajectoryEvaluator(
+            const std::array<double, 3>& init_s,
+            double stop_s,
+            double dis_to_obstacle,
+            const std::vector<DynamicObject> &dynamic_objects_sd,
+            const std::vector<std::shared_ptr<PolynomialCurve1d>> *ptr_trajectory_sets)
+                : init_s_(init_s), dis_to_obstacle_(dis_to_obstacle),
+                stop_s_(stop_s), dynamic_objects_(dynamic_objects_sd){
+        const double end_time = FLAGS_trajectory_time_length;
+
+        std::stringstream ss;
+        // if we have a stop point along the reference line,
+        // filter out the lon. trajectories that pass the stop point.
+        for (const auto& trajectory : *ptr_trajectory_sets) {
+            double lon_end_s = trajectory->Evaluate(0, end_time);
+            if (init_s[0] < stop_s &&
+                lon_end_s + FLAGS_lattice_stop_buffer > stop_s) {
+                continue;
+            }
+
+            if (!ConstraintChecker1d::IsValidLongitudinalTrajectory(*(trajectory))) {
+                continue;
+            }
+#ifdef JMT_DEBUG
+/////output cost value
+#ifdef JMT_VISUAL
+
+            std::pair<std::pair<std::vector<double>,double>,Result> cost_with_component
+                    = EvaluateEmergencyDebug(trajectory, ss);  // TODO: update here
+#else
+            std::pair<std::pair<std::vector<double>,double>,Result> cost_with_component
+                    = EvaluateEmergency2(trajectory);  // TODO: update here
+#endif
+            cost_queue_with_components_.emplace(std::make_pair(
+                    std::make_pair(trajectory,cost_with_component.first),
+                    cost_with_component.second));
+#else
+            std::pair<double,Result> cost = EvaluateEmergency(stop_s, target_speed, dis_to_obstacle, trajectory);
+            cost_queue_.emplace(std::make_pair(std::make_pair(trajectory, cost.first),cost.second));
+#endif
+        }
+
+#ifdef JMT_VISUAL
+        cost_pipe(ss);
+        std::stringstream ss_car;
+        ss_car << init_s[0] << ";" << init_s[1] << ";" << init_s[2] << ";" << -6.0 << ";"
+               << 0.0 << ";" << 0.0 << ";" << 1.5 << ";" << 2.0
+               << std::endl;
+        for(const auto &obstacle : dynamic_objects_sd){
+            ss_car << obstacle.S[0] << ";" << obstacle.S[1] << ";" << obstacle.S[2] << ";" << obstacle.D[0] << ";"
+                   << obstacle.D[1] << ";" << obstacle.D[2] << ";" << obstacle.half_width << ";" << obstacle.half_length
+                   << std::endl;
+        }
+//        AWARN << ss_car.str();
+        car_pipe(ss_car);
+#endif
+
+        ADEBUG << "Number of valid 1d trajectory pairs: " << cost_queue_.size();
+    }
 
     double LonObjectiveCostDebug(
             const PtrTrajectory1d& lon_trajectory,
@@ -252,6 +311,117 @@ namespace {
                 dist_travelled_cost * FLAGS_weight_dist_travelled) /
                (FLAGS_weight_target_speed + FLAGS_weight_dist_travelled);
     }
+
+    std::pair<std::pair<std::vector<double>,double>,Result> TrajectoryEvaluator::EvaluateEmergencyDebug(
+            const PtrTrajectory1d& lon_trajectory, std::stringstream &ss) const {
+        // Costs:
+        // 1. Cost of collision on static obstacles.
+        // 2. Cost of missing the objective, e.g., cruise, stop, etc.
+        // 3. Cost of logitudinal jerk
+        // 4. Cost of logitudinal collision
+
+        Result result = Result::VALID;
+
+        // Cost of collision on  obstacle
+        double collision_cost_signed = LonCollisionCost(lon_trajectory);
+        double collision_cost = std::fabs(collision_cost_signed);
+        if(collision_cost_signed < -std::numeric_limits<double>::epsilon()){
+            result = Result::LON_STATIC_COLLISION;
+        } else if(collision_cost_signed > std::numeric_limits<double>::epsilon()){
+            result = Result::LON_DYNAMIC_COLLISION;
+        }
+
+        double lon_objective_cost = 0.0;
+
+        double lon_jerk_cost = LonComfortCost(lon_trajectory);
+//        double lon_jerk_cost = 0.0;
+
+//        double centripetal_acc_cost = CentripetalAccelerationCost(lon_trajectory);
+        double centripetal_acc_cost = 0.0;
+
+
+        std::vector<double> res_vec = {lon_objective_cost, lon_jerk_cost, collision_cost, centripetal_acc_cost};
+
+        ss << lon_trajectory->Evaluate(0, lon_trajectory->ParamLength()) - lon_trajectory->Evaluate(0, 0.0)
+           << ";" << lon_trajectory->Evaluate(1, lon_trajectory->ParamLength()) << ";" << lon_jerk_cost
+           << ";" << collision_cost << std::endl;
+
+
+        return std::make_pair(std::make_pair(res_vec, lon_objective_cost * FLAGS_weight_lon_objective +
+                                                      lon_jerk_cost * FLAGS_weight_lon_jerk +
+                                                      std::fabs(collision_cost) * FLAGS_weight_lon_collision +
+                                                      centripetal_acc_cost * FLAGS_weight_centripetal_acceleration),
+                              result);
+
+    }
+
+    std::pair<std::pair<std::vector<double>,double>,Result> TrajectoryEvaluator::EvaluateEmergency2(
+            const PtrTrajectory1d& lon_trajectory) const {
+        // Costs:
+        // 1. Cost of collision on static obstacles.
+        // 2. Cost of missing the objective, e.g., cruise, stop, etc.
+        // 3. Cost of logitudinal jerk
+        // 4. Cost of logitudinal collision
+
+        Result result = Result::VALID;
+
+        // Cost of collision on  obstacle
+        double collision_cost_signed = LonCollisionCost(lon_trajectory);
+        double collision_cost = std::fabs(collision_cost_signed);
+        if(collision_cost_signed < -std::numeric_limits<double>::epsilon()){
+            result = Result::LON_STATIC_COLLISION;
+        } else if(collision_cost_signed > std::numeric_limits<double>::epsilon()){
+            result = Result::LON_DYNAMIC_COLLISION;
+        }
+
+        double lon_objective_cost = 0.0;
+
+        double lon_jerk_cost = LonComfortCost(lon_trajectory);
+//        double lon_jerk_cost = 0.0;
+
+//        double centripetal_acc_cost = CentripetalAccelerationCost(lon_trajectory);
+        double centripetal_acc_cost = 0.0;
+
+
+        std::vector<double> res_vec = {lon_objective_cost, lon_jerk_cost, collision_cost, centripetal_acc_cost};
+
+        return std::make_pair(std::make_pair(res_vec, lon_objective_cost * FLAGS_weight_lon_objective +
+                                                      lon_jerk_cost * FLAGS_weight_lon_jerk +
+                                                      std::fabs(collision_cost) * FLAGS_weight_lon_collision +
+                                                      centripetal_acc_cost * FLAGS_weight_centripetal_acceleration),
+                              result);
+    }
+
+
+    std::pair<double,Result> TrajectoryEvaluator::EvaluateEmergency (const PtrTrajectory1d &lon_trajectory) const {
+        // Costs:
+        // 1. Cost of collision on static obstacles.
+        // 2. Cost of missing the objective, e.g., cruise, stop, etc.
+        // 3. Cost of logitudinal jerk
+        // 4. Cost of logitudinal collision
+
+        // Cost of collision on  obstacle
+        double collision_cost_signed = LonCollisionCost(lon_trajectory);
+        double collision_cost = std::fabs(collision_cost_signed);
+        if(collision_cost_signed < -std::numeric_limits<double>::epsilon()){
+            return std::make_pair(FLAGS_weight_lon_collision * collision_cost, Result::LON_STATIC_COLLISION);
+        } else if(collision_cost_signed > std::numeric_limits<double>::epsilon()){
+            return std::make_pair(FLAGS_weight_lon_collision * collision_cost, Result::LON_DYNAMIC_COLLISION);
+        }
+
+        // Longitudinal costs
+        double lon_objective_cost = 0.0;
+
+        double lon_jerk_cost = LonComfortCost(lon_trajectory);
+
+        double centripetal_acc_cost = 0.0;
+
+        return std::make_pair(lon_objective_cost * FLAGS_weight_lon_objective +
+                              lon_jerk_cost * FLAGS_weight_lon_jerk +
+                              centripetal_acc_cost * FLAGS_weight_centripetal_acceleration,
+                              Result::VALID);
+    }
+
 
     std::pair<std::pair<std::vector<double>,double>,Result> TrajectoryEvaluator::EvaluateDebug(
             const PtrTrajectory1d& lon_trajectory, std::stringstream &ss) const {
@@ -295,7 +465,7 @@ namespace {
                                                       lon_jerk_cost * FLAGS_weight_lon_jerk +
                                                       std::fabs(collision_cost) * FLAGS_weight_lon_collision +
                                                       centripetal_acc_cost * FLAGS_weight_centripetal_acceleration),
-                              Result::VALID);
+                                result);
 
     }
 
@@ -335,7 +505,7 @@ namespace {
                                                       lon_jerk_cost * FLAGS_weight_lon_jerk +
                                                       std::fabs(collision_cost) * FLAGS_weight_lon_collision +
                                                       centripetal_acc_cost * FLAGS_weight_centripetal_acceleration),
-                              Result::VALID);
+                              result);
 
     }
 
@@ -497,10 +667,10 @@ namespace {
                     if((object.S[0] + object.S[1]*delta_t_) < init_s_[0]){
                         continue;
                     }
-                    AERROR << "Collision: " << "dis_s: " << lon_trajectory->Evaluate(0, lon_trajectory->ParamLength()) - lon_trajectory->Evaluate(0, 0.0)
-                           << ", vel: " << lon_trajectory->Evaluate(1, lon_trajectory->ParamLength()) << ", current_t: " << t
-                           << ", delta_s: " << delta_s << ", delta_d: " << delta_d << ", our s: " << init_s_[0]
-                           << ", object_s: " << object.S[0] << ", object_d: " << object.D[0];
+//                    AERROR << "Collision: " << "dis_s: " << lon_trajectory->Evaluate(0, lon_trajectory->ParamLength()) - lon_trajectory->Evaluate(0, 0.0)
+//                           << ", vel: " << lon_trajectory->Evaluate(1, lon_trajectory->ParamLength()) << ", current_t: " << t
+//                           << ", delta_s: " << delta_s << ", delta_d: " << delta_d << ", our s: " << init_s_[0]
+//                           << ", object_s: " << object.S[0] << ", object_d: " << object.D[0];
                     return 1.0;
                 }
 
@@ -512,9 +682,9 @@ namespace {
 //                }
             }
         }
-        AERROR << "No collision: " << "dis_s: " << lon_trajectory->Evaluate(0, lon_trajectory->ParamLength()) - lon_trajectory->Evaluate(0, 0.0)
-               << ", vel: " << lon_trajectory->Evaluate(1, lon_trajectory->ParamLength()) << ", min_s: " << min_delta_s
-               << ", min_d: " << min_delta_d ;
+//        AERROR << "No collision: " << "dis_s: " << lon_trajectory->Evaluate(0, lon_trajectory->ParamLength()) - lon_trajectory->Evaluate(0, 0.0)
+//               << ", vel: " << lon_trajectory->Evaluate(1, lon_trajectory->ParamLength()) << ", min_s: " << min_delta_s
+//               << ", min_d: " << min_delta_d ;
 
 //        // my new method
 //        int cnt = 0;

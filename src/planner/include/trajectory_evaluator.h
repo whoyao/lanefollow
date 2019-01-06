@@ -64,6 +64,13 @@ namespace JMT {
                 const std::vector<DynamicObject> &dynamic_objects_sd,
                 const std::vector<std::shared_ptr<PolynomialCurve1d>> *ptr_trajectory_sets);
 
+        explicit TrajectoryEvaluator(
+                const std::array<double, 3>& init_s,
+                double stop_s,
+                double dis_to_obstacle,
+                const std::vector<DynamicObject> &dynamic_objects_sd,
+                const std::vector<std::shared_ptr<PolynomialCurve1d>> *ptr_trajectory_sets);
+
         virtual ~TrajectoryEvaluator() = default;
 
         bool has_more_trajectory_pairs() const;
@@ -88,6 +95,15 @@ namespace JMT {
 
         std::pair<std::pair<std::vector<double>,double>,Result>  EvaluateDebug(
                 const std::shared_ptr<PolynomialCurve1d>& lon_trajectory, std::stringstream &ss) const;
+
+        std::pair<std::pair<std::vector<double>,double>,Result> EvaluateEmergencyDebug(
+                const std::shared_ptr<PolynomialCurve1d>& lon_trajectory, std::stringstream &ss) const;
+
+        std::pair<std::pair<std::vector<double>,double>,Result> EvaluateEmergency2(
+                const std::shared_ptr<PolynomialCurve1d>&lon_trajectory) const;
+
+        std::pair<double,Result> EvaluateEmergency(
+                const std::shared_ptr<PolynomialCurve1d>&lon_trajectory) const;
 
         double LonComfortCost(const std::shared_ptr<PolynomialCurve1d>& lon_trajectory) const;
 
