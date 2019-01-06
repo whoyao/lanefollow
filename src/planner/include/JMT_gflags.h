@@ -13,8 +13,10 @@
 DECLARE_double(car_default_d);
 
 // safaty
+DECLARE_double(half_car_length);
+DECLARE_double(half_car_width);
 DECLARE_double(head_offset);
-DECLARE_double(rear_to_center);
+DECLARE_double(origin_to_center);
 DECLARE_double(bumper_to_front);
 
 // end sample

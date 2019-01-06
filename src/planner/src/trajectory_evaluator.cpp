@@ -486,12 +486,29 @@ namespace {
                 if((delta_s)*(delta_s)+(delta_d)*(delta_d) <
                    object.half_length*object.half_length + object.half_width*object.half_width
                    + FLAGS_radius_safe_dis*FLAGS_radius_safe_dis){
-                    return 1.0;
+                    return 0.0;
                 }
             }
         }
 
         // my new method
+        for(const auto &object : dynamic_objects_){
+            double dis_s = object.S[0] + object.S[1]*delta_t_ - (init_s_[0] + FLAGS_origin_to_center);
+            double fix_dis_s = dis_s - std::copysign(FLAGS_half_car_length + object.half_length, dis_s);
+            double collsion_t;
+            if(std::signbit(fix_dis_s) != std::signbit(dis_s)){
+                collsion_t = 0.0;
+            } else {
+                collsion_t = fix_dis_s/(init_s_[1] - object.S[1]);
+            }
+
+            if(collsion_t > -std::numeric_limits<double>::epsilon() && collsion_t <= FLAGS_trajectory_time_length){
+                double object_d = (object.D)[0] + (object.D)[1]*(collsion_t+delta_t_);
+                if(std::fabs(object_d - FLAGS_car_default_d) < (FLAGS_half_car_width + object.half_width)){
+                    return 1.5;
+                }
+            }
+        }
 
         return 0.0;
     }

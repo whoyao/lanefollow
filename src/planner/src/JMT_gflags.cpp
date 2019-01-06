@@ -11,11 +11,15 @@ DEFINE_double(car_default_d, -6.0,
 "Default d position of car");
 
 // safaty
+DEFINE_double(half_car_length, 2.0,
+"Half length of car");
+DEFINE_double(half_car_width, 1.5,
+"Half width of car");
 DEFINE_double(head_offset, 3.94,
 "Distance between bumper and origin");
-DEFINE_double(rear_to_center, 0.0,
-"Half distance of front wheel to rear wheel");
-DEFINE_double(bumper_to_front, 2.0,
+DEFINE_double(origin_to_center, 0.0,
+"Distance between origin and car center ");
+DEFINE_double(bumper_to_front, 1.1 ,
 "Distance front front wheel to bumper");
 
 DEFINE_int32(num_velocity_sample, 6,
